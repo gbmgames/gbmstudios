@@ -1,0 +1,46 @@
+services:
+  - type: web
+    name: gbm-studio
+    runtime: node
+    plan: starter
+    region: oregon
+    buildCommand: rm -rf app && git clone -q gbm-studio.bundle app && cd app && corepack enable && pnpm install --frozen-lockfile --prod=false && pnpm --filter @gbm/web build && pnpm --filter @gbm/server build && pnpm --filter @gbm/agent build
+    startCommand: cd app/apps/server && export APP_URL=${APP_URL:-$RENDER_EXTERNAL_URL} GBM_ENCRYPTION_KEYS="k1:$(node -e "process.stdout.write(require('crypto').createHash('sha256').update(process.env.GBM_SECRET).digest('base64'))")" && node dist/index.js
+    healthCheckPath: /api/health
+    disk:
+      name: gbm-data
+      mountPath: /var/data
+      sizeGB: 10
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: gbm-db
+          property: connectionString
+      - key: GBM_SECRET
+        generateValue: true
+      - key: COOKIE_SECURE
+        value: "true"
+      - key: TRUST_PROXY
+        value: "true"
+      - key: ENABLE_MOCK_PROVIDERS
+        value: "false"
+      - key: WORKER_INLINE
+        value: "true"
+      - key: STORAGE_LOCAL_DIR
+        value: /var/data/storage
+      - key: WEB_DIST_DIR
+        value: ../web/dist
+      - key: MAIL_DRIVER
+        value: log
+      - key: BOOTSTRAP_ADMIN_EMAILS
+        sync: false
+
+databases:
+  - name: gbm-db
+    plan: basic-256mb
+    region: oregon
+    postgresMajorVersion: "16"
